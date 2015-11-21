@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		5687FFA11C01287400C48936 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 5687FFA01C01287400C48936 /* main.c */; };
+		5687FFA11C01287400C48936 /* cpuinfo_x86.c in Sources */ = {isa = PBXBuildFile; fileRef = 5687FFA01C01287400C48936 /* cpuinfo_x86.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,7 +24,7 @@
 
 /* Begin PBXFileReference section */
 		5687FF9D1C01287400C48936 /* cpuid_sgx_info */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cpuid_sgx_info; sourceTree = BUILT_PRODUCTS_DIR; };
-		5687FFA01C01287400C48936 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		5687FFA01C01287400C48936 /* cpuinfo_x86.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = cpuinfo_x86.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,7 +57,7 @@
 		5687FF9F1C01287400C48936 /* cpuid_sgx_info */ = {
 			isa = PBXGroup;
 			children = (
-				5687FFA01C01287400C48936 /* main.c */,
+				5687FFA01C01287400C48936 /* cpuinfo_x86.c */,
 			);
 			path = cpuid_sgx_info;
 			sourceTree = "<group>";
@@ -118,7 +118,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5687FFA11C01287400C48936 /* main.c in Sources */,
+				5687FFA11C01287400C48936 /* cpuinfo_x86.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
