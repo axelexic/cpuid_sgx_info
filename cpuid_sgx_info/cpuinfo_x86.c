@@ -545,8 +545,8 @@ static void cpuid_set_sgx_info(i386_cpu_info_t* info_p){
     
     memset(cpuid_reg, 0, sizeof(cpuid_reg));
     
-    cpuid_reg[0]=0x7;
-    cpuid_reg[2]=0;
+    cpuid_reg[eax]=0x7;
+    cpuid_reg[ecx]=0;
     
     cpuid(cpuid_reg);
     
@@ -554,26 +554,26 @@ static void cpuid_set_sgx_info(i386_cpu_info_t* info_p){
         
         /* leaf 0x12, subleaf 0 xontents. */
         memset(cpuid_reg, 0, sizeof(cpuid_reg));
-        cpuid_reg[0] = 0x12;
-        cpuid_reg[2] = 0;
+        cpuid_reg[eax] = 0x12;
+        cpuid_reg[ecx] = 0;
         cpuid(cpuid_reg);
         
-        if ((cpuid_reg[0] & SGX1_BIT) != 0) {
+        if ((cpuid_reg[eax] & SGX1_BIT) != 0) {
             info_p->sgx_info.sgx1_supported = TRUE;
         }
         
-        if ((cpuid_reg[0] & SGX2_BIT) != 0) {
+        if ((cpuid_reg[eax] & SGX2_BIT) != 0) {
             info_p->sgx_info.sgx2_supported = TRUE;
         }
         
-        info_p->sgx_info.miscselect     = cpuid_reg[1];
-        info_p->sgx_info.max_enclave_32 = cpuid_reg[3] & 0xFF;
-        info_p->sgx_info.max_enclave_64 = (cpuid_reg[3] >> 8) & 0xFF;
+        info_p->sgx_info.miscselect     = cpuid_reg[ebx];
+        info_p->sgx_info.max_enclave_32 = cpuid_reg[edx] & 0xFF;
+        info_p->sgx_info.max_enclave_64 = (cpuid_reg[edx] >> 8) & 0xFF;
         
         /* leaf 0x12, subleaf 1 contents. */
         memset(cpuid_reg, 0, sizeof(cpuid_reg));
-        cpuid_reg[0] = 0x12;
-        cpuid_reg[2] = 1;
+        cpuid_reg[eax] = 0x12;
+        cpuid_reg[ecx] = 1;
         cpuid(cpuid_reg);
         memcpy(info_p->sgx_info.secs_attrs, cpuid_reg, sizeof(cpuid_reg));
     }
