@@ -5,7 +5,10 @@
  *
  * Reuses code from the Mac OS X kernel.
  *
- * Compilation: gcc -march=i386 -m32 -o cpuinfo_x86 cpuinfo_x86.c
+ * Compilation: clang -o cpuinfo_x86 cpuinfo_x86.c
+ * 
+ * Axelexic: Adding Intel SGX extended information 
+ * change asm to compile on 64-bit machines
  */
 
 #include <stdio.h>
@@ -20,10 +23,10 @@ typedef enum { eax, ebx, ecx, edx } cpuid_register_t;
 static inline void cpuid(uint32_t* data)
 {
     asm(
-        "pushl %%ebx       \n"
+        "pushq %%rbx       \n"
         "cpuid             \n"
-        "movl  %%ebx, %%esi\n"
-        "popl  %%ebx       \n"
+        "movq  %%rbx, %%rsi\n"
+        "popq  %%rbx       \n"
         : "=a"   (data[eax]),
         "=S"   (data[ebx]),
         "=c"   (data[ecx]),
@@ -37,10 +40,10 @@ static inline void cpuid(uint32_t* data)
 static inline void do_cpuid(uint32_t selector, uint32_t* data)
 {
     asm(
-        "pushl %%ebx       \n"
+        "pushq %%rbx       \n"
         "cpuid             \n"
-        "movl  %%ebx, %%esi\n"
-        "popl  %%ebx       \n"
+        "movq  %%rbx, %%rsi\n"
+        "popq  %%rbx       \n"
         : "=a"   (data[0]),
         "=S"   (data[1]),
         "=c"   (data[2]),
@@ -446,6 +449,26 @@ typedef struct {
     uint32_t      partitions;
 } cpuid_cache_desc_t;
 
+typedef struct sgx_info{
+#define SGX_BIT                     _Bit(2)
+#define SGX1_BIT                    _Bit(0)
+#define SGX2_BIT                    _Bit(1)
+    
+    boolean_t sgx1_supported;
+    boolean_t sgx2_supported;
+    uint32_t  miscselect;
+    uint8_t   max_enclave_32;
+    uint8_t   max_enclave_64;
+    uint32_t  secs_attrs[4];
+#define SECS_ATTR_INIT              _Bit(0)
+#define SECS_ATTR_DEBUG             _Bit(1)
+#define SECS_ATTR_MODE64BIT         _Bit(2)
+#define SECS_ATTR_UNUSED_BIT2       _Bit(3)
+#define SECS_ATTR_PROVISIONKEY      _Bit(4)
+#define SECS_ATTR_EINITTOKENKEY     _Bit(5)
+}sgx_info_t;
+
+
 typedef struct {
     
     cpu_type_t    cpuid_type;
@@ -509,9 +532,53 @@ typedef struct {
     uint8_t       cpuid_arch_perf_fixed_number;
     uint8_t       cpuid_arch_perf_fixed_width;
     
+    /* Intel SGX related information */
+    sgx_info_t   sgx_info;
 } i386_cpu_info_t;
 
+
 static i386_cpu_info_t cpuid_cpu_info;
+
+
+static void cpuid_set_sgx_info(i386_cpu_info_t* info_p){
+    uint32_t cpuid_reg[4];
+    
+    memset(cpuid_reg, 0, sizeof(cpuid_reg));
+    
+    cpuid_reg[0]=0x7;
+    cpuid_reg[2]=0;
+    
+    cpuid(cpuid_reg);
+    
+    if (cpuid_reg[1] & SGX_BIT) {
+        
+        /* leaf 0x12, subleaf 0 xontents. */
+        memset(cpuid_reg, 0, sizeof(cpuid_reg));
+        cpuid_reg[0] = 0x12;
+        cpuid_reg[2] = 0;
+        cpuid(cpuid_reg);
+        
+        if ((cpuid_reg[0] & SGX1_BIT) != 0) {
+            info_p->sgx_info.sgx1_supported = TRUE;
+        }
+        
+        if ((cpuid_reg[0] & SGX2_BIT) != 0) {
+            info_p->sgx_info.sgx2_supported = TRUE;
+        }
+        
+        info_p->sgx_info.miscselect     = cpuid_reg[1];
+        info_p->sgx_info.max_enclave_32 = cpuid_reg[3] & 0xFF;
+        info_p->sgx_info.max_enclave_64 = (cpuid_reg[3] >> 8) & 0xFF;
+        
+        /* leaf 0x12, subleaf 1 contents. */
+        memset(cpuid_reg, 0, sizeof(cpuid_reg));
+        cpuid_reg[0] = 0x12;
+        cpuid_reg[2] = 1;
+        cpuid(cpuid_reg);
+        memcpy(info_p->sgx_info.secs_attrs, cpuid_reg, sizeof(cpuid_reg));
+    }
+    
+}
 
 static void
 cpuid_set_generic_info(i386_cpu_info_t* info_p)
@@ -1092,7 +1159,32 @@ main(void)
         printf("%-22s: %s\n", extfeature_map[i].name,
                extfeature_map_detailed[i].name);
     }
-    printf("\n");
+    
+    if (strncasecmp(I->cpuid_vendor, CPUID_VID_INTEL, 0) == 0) {
+        cpuid_set_sgx_info(I);
+        if (I->sgx_info.sgx1_supported || I->sgx_info.sgx2_supported) {
+            printf("# SGX Information\n");
+            printf("\n");
+            if (I->sgx_info.sgx1_supported) {
+                printf("%-22s: %s\n", "SGX1 Supported", "True");
+            }
+            if (I->sgx_info.sgx1_supported) {
+                printf("%-22s: %s\n", "SGX2 Supported", "True");
+            }else{
+                printf("%-22s: %s\n", "SGX2 Supported", "False");
+            }
+            printf("%-22s: 2^%d", "Max 32-bit enclave size", I->sgx_info.max_enclave_32);
+            printf("%-22s: 2^%d", "Max 64-bit enclave size", I->sgx_info.max_enclave_64);
+            printf("%-22s: 0x%.8x\n", "MISCSECS", I->sgx_info.miscselect);
+            printf("## SECS Attributes\n");
+            printf(" %-21s: %llu", "Initialized", (I->sgx_info.secs_attrs[1] & SECS_ATTR_INIT));
+            printf(" %-21s: %llu", "Debugged", (I->sgx_info.secs_attrs[1] & SECS_ATTR_DEBUG) >> 1);
+            printf(" %-21s: %llu", "Mode64", (I->sgx_info.secs_attrs[1] & SECS_ATTR_MODE64BIT) >> 2);
+            printf(" %-21s: %llu", "PROVISIONKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_PROVISIONKEY) >> 4);
+            printf(" %-21s: %llu", "EINITTOKENKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_EINITTOKENKEY) >> 5);
+            
+        }
+    }
     
     exit(0);
 }
