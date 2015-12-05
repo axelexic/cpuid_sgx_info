@@ -20,38 +20,21 @@
 
 typedef enum { eax, ebx, ecx, edx } cpuid_register_t;
 
-#ifndef WIN32 
+#ifndef WIN32
 
-static inline void cpuid(uint32_t* data)
+#include <cpuid.h>
+
+static void cpuid(uint32_t* data)
 {
-    asm(
-        "pushq %%rbx       \n"
-        "cpuid             \n"
-        "movq  %%rbx, %%rsi\n"
-        "popq  %%rbx       \n"
-        : "=a"   (data[eax]),
-        "=S"   (data[ebx]),
-        "=c"   (data[ecx]),
-        "=d"   (data[edx])
-        : "a"    (data[eax]),
-        "S"    (data[ebx]),
-        "c"    (data[ecx]),
-        "d"    (data[edx]));
+    assert(data);
+    int function_id = data[eax];
+    int sub_func_id = data[ecx];
+    __cpuid_count(function_id, sub_func_id, data[eax], data[ebx], data[ecx], data[edx]);
 }
 
-static inline void do_cpuid(uint32_t selector, uint32_t* data)
-{
-    asm(
-        "pushq %%rbx       \n"
-        "cpuid             \n"
-        "movq  %%rbx, %%rsi\n"
-        "popq  %%rbx       \n"
-        : "=a"   (data[0]),
-        "=S"   (data[1]),
-        "=c"   (data[2]),
-        "=d"   (data[3])
-        : "a"    (selector)
-        );
+static void do_cpuid(uint32_t selector, uint32_t* data) {
+    assert(data);
+    __cpuid(selector, data[eax], data[ebx], data[ecx], data[edx]);
 }
 
 #else // Win32
@@ -1215,5 +1198,5 @@ main(void)
         }
     }
     
-    exit(0);
+    return 0;
 }
