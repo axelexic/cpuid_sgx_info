@@ -18,7 +18,11 @@
 #include <stdint.h>
 #include <assert.h>
 
-typedef enum { eax, ebx, ecx, edx } cpuid_register_t;
+typedef enum { eax = 0,
+               ebx = 1,
+               ecx = 2,
+               edx = 3
+        } cpuid_register_t;
 
 #ifndef WIN32
 
