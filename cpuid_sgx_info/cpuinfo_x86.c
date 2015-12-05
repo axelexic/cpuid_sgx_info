@@ -5,10 +5,13 @@
  *
  * Reuses code from the Mac OS X kernel.
  *
- * Compilation: clang -o cpuinfo_x86 cpuinfo_x86.c
- * 
  * Axelexic: Adding Intel SGX extended information 
  * change asm to compile on 64-bit machines
+ *
+ * Compilation 
+ * ** Mac/Linux: clang -o cpuinfo_x86 cpuinfo_x86.c
+ * ** Windows  : cl /Ox -D_CRT_SECURE_NO_WARNINGS cpuinfo_x86.c
+ *
  */
 
 #include <stdio.h>
@@ -24,7 +27,7 @@ typedef enum { eax = 0,
                edx = 3
         } cpuid_register_t;
 
-#ifndef WIN32
+#if !defined(_WIN32) && !defined(_WIN64)
 
 #include <cpuid.h>
 
@@ -560,7 +563,7 @@ static void cpuid_set_sgx_info(i386_cpu_info_t* info_p){
     uint32_t cpuid_reg[4];
     
     memset(cpuid_reg, 0, sizeof(cpuid_reg));
-    
+	memset(&(info_p->sgx_info), 0, sizeof(info_p->sgx_info));
     cpuid_reg[eax]=0x7;
     cpuid_reg[ecx]=0;
     
@@ -1077,10 +1080,10 @@ main(void)
     /* Display */
     
     printf("# Identification\n");
-    printf("%-22s: %s\n", "Vendor", I->cpuid_vendor);
-    printf("%-22s: %s\n", "Brand String", I->cpuid_brand_string);
+    printf("%-26s: %s\n", "Vendor", I->cpuid_vendor);
+    printf("%-26s: %s\n", "Brand String", I->cpuid_brand_string);
     
-    printf("%-22s: %hhd", "Model Number", I->cpuid_model);
+    printf("%-26s: %hhd", "Model Number", I->cpuid_model);
     int i = 0;
     for (; some_model_names[i].model_name; i++) {
         if (some_model_names[i].model_number == I->cpuid_model) {
@@ -1089,17 +1092,17 @@ main(void)
     }
     printf("\n");
     
-    printf("%-22s: %hhd\n", "Family Code", I->cpuid_family);
-    printf("%-22s: %hhd\n", "Extended Model", I->cpuid_extmodel);
-    printf("%-22s: %hhd\n", "Extended Family", I->cpuid_extfamily);
-    printf("%-22s: %hhd\n", "Stepping ID", I->cpuid_stepping);
-    printf("%-22s: %d\n", "Signature", I->cpuid_signature);
+    printf("%-26s: %hhd\n", "Family Code", I->cpuid_family);
+    printf("%-26s: %hhd\n", "Extended Model", I->cpuid_extmodel);
+    printf("%-26s: %hhd\n", "Extended Family", I->cpuid_extfamily);
+    printf("%-26s: %hhd\n", "Stepping ID", I->cpuid_stepping);
+    printf("%-26s: %d\n", "Signature", I->cpuid_signature);
     printf("\n");
     
     printf("# Address Bits\n");
-    printf("%-22s: %d\n", "Physical Addressing",
+    printf("%-26s: %d\n", "Physical Addressing",
            I->cpuid_address_bits_physical);
-    printf("%-22s: %d\n", "Virtual Addressing",
+    printf("%-26s: %d\n", "Virtual Addressing",
            I->cpuid_address_bits_virtual);
     printf("\n");
     
@@ -1124,14 +1127,14 @@ main(void)
         char human_buf[5];
         humanize_number(human_buf, sizeof(human_buf), cd->size, "",
                         HN_AUTOSCALE, HN_B | HN_NOSPACE);
-        printf("%-22s: %s\n", "Size", human_buf);
+        printf("%-26s: %s\n", "Size", human_buf);
         
         if (cd->linesize) {
             humanize_number(human_buf, sizeof(human_buf), cd->linesize, "",
                             HN_AUTOSCALE, HN_B | HN_NOSPACE | HN_DECIMAL);
-            printf("%-22s: %s\n", "Line Size", human_buf);
+            printf("%-26s: %s\n", "Line Size", human_buf);
         } else {
-            printf("%-22s: %s\n", "Line Size", "default");
+            printf("%-26s: %s\n", "Line Size", "default");
         }
         
         char shared_buf[64];
@@ -1142,18 +1145,18 @@ main(void)
             snprintf(shared_buf, sizeof(shared_buf),
                      "shared between %d processor threads", cd->sharing);
         }
-        printf("%-22s: %s\n", "Sharing", shared_buf);
+        printf("%-26s: %s\n", "Sharing", shared_buf);
         
-        printf("%-22s: %d\n", "Sets", cd->sets);
-        printf("%-22s: %d\n", "Partitions", cd->partitions);
-        printf("%-22s: %d\n", "Associativity", cd->associativity);
+        printf("%-26s: %d\n", "Sets", cd->sets);
+        printf("%-26s: %d\n", "Partitions", cd->partitions);
+        printf("%-26s: %d\n", "Associativity", cd->associativity);
         printf("\n");
     }
     
     printf("# Translation Lookaside Buffers\n");
-    printf("%-22s: %d large, %d small\n",
+    printf("%-26s: %d large, %d small\n",
            "Instruction TLBs", I->cpuid_itlb_large, I->cpuid_itlb_small);
-    printf("%-22s: %d large, %d small\n",
+    printf("%-26s: %d large, %d small\n",
            "Data TLBs", I->cpuid_dtlb_large, I->cpuid_dtlb_small);
     printf("\n");
     
@@ -1162,7 +1165,7 @@ main(void)
         if ((I->cpuid_features & feature_map[i].mask) == 0) {
             continue;
         }
-        printf("%-22s: %s\n", feature_map[i].name,
+        printf("%-26s: %s\n", feature_map[i].name,
                feature_map_detailed[i].name);
     }
     printf("\n");
@@ -1172,32 +1175,31 @@ main(void)
         if ((I->cpuid_extfeatures & extfeature_map[i].mask) == 0) {
             continue;
         }
-        printf("%-22s: %s\n", extfeature_map[i].name,
+        printf("%-26s: %s\n", extfeature_map[i].name,
                extfeature_map_detailed[i].name);
     }
     
     if (strncasecmp(I->cpuid_vendor, CPUID_VID_INTEL, 0) == 0) {
         cpuid_set_sgx_info(I);
         if (I->sgx_info.sgx1_supported || I->sgx_info.sgx2_supported) {
-            printf("# SGX Information\n");
-            printf("\n");
+            printf("\n# SGX Information\n");
             if (I->sgx_info.sgx1_supported) {
-                printf("%-22s: %s\n", "SGX1 Supported", "True");
+                printf("%-26s: %s\n", "SGX1 Supported", "True");
             }
-            if (I->sgx_info.sgx1_supported) {
-                printf("%-22s: %s\n", "SGX2 Supported", "True");
+            if (I->sgx_info.sgx2_supported) {
+                printf("%-26s: %s\n", "SGX2 Supported", "True");
             }else{
-                printf("%-22s: %s\n", "SGX2 Supported", "False");
+                printf("%-26s: %s\n", "SGX2 Supported", "False");
             }
-            printf("%-22s: 2^%d", "Max 32-bit enclave size", I->sgx_info.max_enclave_32);
-            printf("%-22s: 2^%d", "Max 64-bit enclave size", I->sgx_info.max_enclave_64);
-            printf("%-22s: 0x%.8x\n", "MISCSECS", I->sgx_info.miscselect);
+            printf("%-26s: 2^%d\n", "Max 32-bit enclave size", I->sgx_info.max_enclave_32);
+            printf("%-26s: 2^%d\n", "Max 64-bit enclave size", I->sgx_info.max_enclave_64);
+            printf("%-26s: 0x%.8x\n", "MISCSECS", I->sgx_info.miscselect);
             printf("## SECS Attributes\n");
-            printf(" %-21s: %llu", "Initialized", (I->sgx_info.secs_attrs[1] & SECS_ATTR_INIT));
-            printf(" %-21s: %llu", "Debugged", (I->sgx_info.secs_attrs[1] & SECS_ATTR_DEBUG) >> 1);
-            printf(" %-21s: %llu", "Mode64", (I->sgx_info.secs_attrs[1] & SECS_ATTR_MODE64BIT) >> 2);
-            printf(" %-21s: %llu", "PROVISIONKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_PROVISIONKEY) >> 4);
-            printf(" %-21s: %llu", "EINITTOKENKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_EINITTOKENKEY) >> 5);
+            printf("  %-24s: %llu\n", "Initialized", (I->sgx_info.secs_attrs[1] & SECS_ATTR_INIT));
+            printf("  %-24s: %llu\n", "Debugged", (I->sgx_info.secs_attrs[1] & SECS_ATTR_DEBUG) >> 1);
+            printf("  %-24s: %llu\n", "Mode64", (I->sgx_info.secs_attrs[1] & SECS_ATTR_MODE64BIT) >> 2);
+            printf("  %-24s: %llu\n", "PROVISIONKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_PROVISIONKEY) >> 4);
+            printf("  %-24s: %llu\n", "EINITTOKENKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_EINITTOKENKEY) >> 5);
             
         }
     }
