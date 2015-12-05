@@ -16,8 +16,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdint.h>
+#include <assert.h>
 
 typedef enum { eax, ebx, ecx, edx } cpuid_register_t;
+
+#ifndef WIN32 
 
 static inline void cpuid(uint32_t* data)
 {
@@ -51,15 +54,39 @@ static inline void do_cpuid(uint32_t selector, uint32_t* data)
         );
 }
 
-typedef uint32_t cpu_type_t;
-typedef uint32_t cpu_subtype_t;
-typedef uint32_t cpu_threadtype_t;
+#else // Win32
 
-#if defined(__x86_64__)
+#include <Windows.h>
+#include <intrin.h>
+
+#define bcopy(b1,b2,len) (memmove((b2), (b1), (len)), (void) 0)
+#define bzero(b,len) (memset((b), '\0', (len)), (void) 0)  
+#define strncasecmp(x,y,z) _strnicmp(x,y,z)
+
+static void cpuid(uint32_t* data)
+{
+    assert(data);
+    int function_id = data[eax];
+    int sub_func_id = data[ecx];
+    __cpuidex(data, function_id, sub_func_id);
+}
+
+static void do_cpuid(uint32_t selector, uint32_t* data) {
+    assert(data);
+    __cpuid(data, selector);
+}
+
+#endif // Win32 
+
+#if defined(__x86_64__) || defined(_M_X64)
 typedef uint32_t boolean_t;
 #else
 typedef int32_t  boolean_t;
 #endif
+
+typedef uint32_t cpu_type_t;
+typedef uint32_t cpu_subtype_t;
+typedef uint32_t cpu_threadtype_t;
 
 #ifndef TRUE
 #define TRUE  1
@@ -92,7 +119,10 @@ struct {
 #define _Bit(n)         (1ULL << n)
 #define _HBit(n)        (1ULL << ((n) + 32))
 
+#ifndef min
 #define min(a,b)        ((a) < (b) ? (a) : (b))
+#endif // !min
+
 #define quad(hi,lo)     (((uint64_t)(hi)) << 32 | (lo))
 #define bit(n)          (1UL << (n))
 #define bitmask(h,l)    ((bit(h) | (bit(h) - 1)) & ~(bit(l) - 1))
