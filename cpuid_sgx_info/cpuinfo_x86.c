@@ -468,6 +468,18 @@ typedef struct {
     uint32_t      partitions;
 } cpuid_cache_desc_t;
 
+typedef struct sgx_epc_info {
+    void*  phy_addr;
+    size_t size;
+}sgx_epc_info_t;
+
+#define MAX_EPC_COUNT 16
+#define EPC_IS_VALID(x) (((x) & 0x8) != 0)
+#define EPC_ADDRESS(reg_eax, reg_ebx) ((((uint64_t)(reg_ebx)) << 32) | ((reg_eax) >> 12))
+#define EPC_SIZE(reg_ecx, reg_edx) (((reg_ecx) & 0x8) == 0)?0:\
+    ((((uint64_t)(reg_edx)) << 32) | ((reg_ecx) >> 12))
+
+
 typedef struct sgx_info{
 #define SGX_BIT                     _Bit(2)
 #define SGX1_BIT                    _Bit(0)
@@ -479,6 +491,8 @@ typedef struct sgx_info{
     uint8_t   max_enclave_32;
     uint8_t   max_enclave_64;
     uint32_t  secs_attrs[4];
+    sgx_epc_info_t epc_info[MAX_EPC_COUNT];
+
 #define SECS_ATTR_INIT              _Bit(0)
 #define SECS_ATTR_DEBUG             _Bit(1)
 #define SECS_ATTR_MODE64BIT         _Bit(2)
@@ -570,7 +584,7 @@ static void cpuid_set_sgx_info(i386_cpu_info_t* info_p){
     cpuid(cpuid_reg);
     
     if (cpuid_reg[1] & SGX_BIT) {
-        
+        int epc_ndx;
         /* leaf 0x12, subleaf 0 xontents. */
         memset(cpuid_reg, 0, sizeof(cpuid_reg));
         cpuid_reg[eax] = 0x12;
@@ -595,6 +609,23 @@ static void cpuid_set_sgx_info(i386_cpu_info_t* info_p){
         cpuid_reg[ecx] = 1;
         cpuid(cpuid_reg);
         memcpy(info_p->sgx_info.secs_attrs, cpuid_reg, sizeof(cpuid_reg));
+        memset(info_p->sgx_info.epc_info, 0, sizeof(info_p->sgx_info.epc_info));
+
+        for (epc_ndx = 0; epc_ndx < MAX_EPC_COUNT; epc_ndx++)
+        {
+            /* leaf 0x12, subleaf 1 contents. */
+            memset(cpuid_reg, 0, sizeof(cpuid_reg));
+            cpuid_reg[eax] = 0x12;
+            cpuid_reg[ecx] = epc_ndx + 2;
+            cpuid(cpuid_reg);
+            if (EPC_IS_VALID(cpuid_reg[eax]))
+            {
+                info_p->sgx_info.epc_info[epc_ndx].phy_addr = 
+                     (void*)EPC_ADDRESS(cpuid_reg[eax], cpuid_reg[eax]);
+                info_p->sgx_info.epc_info[epc_ndx].size =
+                    (size_t)EPC_SIZE(cpuid_reg[ecx], cpuid_reg[edx]);
+            }
+        }
     }
     
 }
@@ -1182,6 +1213,7 @@ main(void)
     if (strncasecmp(I->cpuid_vendor, CPUID_VID_INTEL, 0) == 0) {
         cpuid_set_sgx_info(I);
         if (I->sgx_info.sgx1_supported || I->sgx_info.sgx2_supported) {
+            int count = 0;
             printf("\n# SGX Information\n");
             if (I->sgx_info.sgx1_supported) {
                 printf("%-26s: %s\n", "SGX1 Supported", "True");
@@ -1200,7 +1232,15 @@ main(void)
             printf("  %-24s: %llu\n", "Mode64", (I->sgx_info.secs_attrs[1] & SECS_ATTR_MODE64BIT) >> 2);
             printf("  %-24s: %llu\n", "PROVISIONKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_PROVISIONKEY) >> 4);
             printf("  %-24s: %llu\n", "EINITTOKENKEY Available", (I->sgx_info.secs_attrs[1] & SECS_ATTR_EINITTOKENKEY) >> 5);
-            
+            printf("## EPC Address information\n");
+            while (count < MAX_EPC_COUNT && I->sgx_info.epc_info[count].phy_addr != NULL)
+            {
+                printf("  {START_ADDRESS : %.12p; SIZE: %llu}\n",
+                    I->sgx_info.epc_info[count].phy_addr,
+                    I->sgx_info.epc_info[count].size);
+                count++;
+            }
+            printf("\n");
         }
     }
     
