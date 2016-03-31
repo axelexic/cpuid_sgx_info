@@ -484,7 +484,7 @@ typedef struct sgx_info{
 #define SGX_BIT                     _Bit(2)
 #define SGX1_BIT                    _Bit(0)
 #define SGX2_BIT                    _Bit(1)
-    
+    boolean_t sgx_supported;
     boolean_t sgx1_supported;
     boolean_t sgx2_supported;
     uint32_t  miscselect;
@@ -584,6 +584,7 @@ static void cpuid_set_sgx_info(i386_cpu_info_t* info_p){
     cpuid(cpuid_reg);
     
     if (cpuid_reg[1] & SGX_BIT) {
+        info_p->sgx_info.sgx_supported = TRUE;
         int epc_ndx;
         /* leaf 0x12, subleaf 0 xontents. */
         memset(cpuid_reg, 0, sizeof(cpuid_reg));
@@ -1212,16 +1213,21 @@ main(void)
     
     if (strncasecmp(I->cpuid_vendor, CPUID_VID_INTEL, 0) == 0) {
         cpuid_set_sgx_info(I);
-        if (I->sgx_info.sgx1_supported || I->sgx_info.sgx2_supported) {
+        if (I->sgx_info.sgx_supported) {
             int count = 0;
             printf("\n# SGX Information\n");
+            if (I->sgx_info.sgx_supported) {
+                printf("%-26s: %s\n", "SGX Available", "True");
+            }
             if (I->sgx_info.sgx1_supported) {
-                printf("%-26s: %s\n", "SGX1 Supported", "True");
+                printf("%-26s: %s\n", "SGX1 Supported & Enabled", "True");
+            } else {
+                printf("%-26s: %s\n", "SGX1 Supported & Enabled", "False");
             }
             if (I->sgx_info.sgx2_supported) {
-                printf("%-26s: %s\n", "SGX2 Supported", "True");
+                printf("%-26s: %s\n", "SGX2 Supported & Enabled", "True");
             }else{
-                printf("%-26s: %s\n", "SGX2 Supported", "False");
+                printf("%-26s: %s\n", "SGX2 Supported & Enabled", "False");
             }
             printf("%-26s: 2^%d\n", "Max 32-bit enclave size", I->sgx_info.max_enclave_32);
             printf("%-26s: 2^%d\n", "Max 64-bit enclave size", I->sgx_info.max_enclave_64);
